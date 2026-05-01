@@ -12,28 +12,35 @@ import (
 	"nofelet/pkg/singleton"
 )
 
-const ice = "ice-candidate"
+const (
+	caller = "caller"
+	callee = "callee"
+)
 
 // GetConnection /connect/:uuid установка sdp сессии
 func (c *Controller) GetConnection(ctx *gin.Context) {
-	conn, sErr := NewWebSocket(ctx, c.Logger)
+	conn, sErr := Upgrader(ctx)
 	if sErr != nil {
 		c.Logger.Error("socket creation", slog.Any("err", sErr))
 	}
 
-	cm := singleton.NewConnectionManager()
-	cm.Save(conn, ctx.Param("uuid"))
+	uuid := ctx.Param("uuid")
 
-	go handleClient(conn, cm, c.Logger)
+	room := singleton.NewRoom()
+	room.Init(uuid)
+
+	go handler(conn, uuid, room, c.Logger)
 }
 
-func handleClient(conn *websocket.Conn, cm *singleton.ConnectionManager, logger *slog.Logger) {
+// handler - обрабатывает коннекты участников
+func handler(conn *websocket.Conn, uuid string, room *singleton.Rooms, logger *slog.Logger) {
 	defer func() {
-		cm.DeleteClient(conn)
+		room.DeleteClient(uuid)
 		_ = conn.Close()
 	}()
 
 	var data view.SDPData
+
 	for {
 		readErr := conn.ReadJSON(&data)
 		if readErr != nil {
@@ -41,14 +48,32 @@ func handleClient(conn *websocket.Conn, cm *singleton.ConnectionManager, logger 
 			break
 		}
 
-		if data.Type == ice {
-			data.SDP = ""
+		r := room.Rooms[uuid]
+
+		switch data.Type {
+		case "join":
+			jErr := Join(data, conn, r, room)
+			if jErr != nil {
+				logger.Error("handler", slog.Any("join error:", jErr))
+			}
+		case "offer":
+			oErr := Offer(data, conn, r, room)
+			if oErr != nil {
+				logger.Error("handler", slog.Any("offer error:", oErr))
+			}
+		case "ice-candidate":
+			iceErr := IceCandidate(data, conn, r, room)
+			if iceErr != nil {
+				logger.Error("handler", slog.Any("ice-candidate error:", iceErr))
+			}
+		case "answer":
+			brErr := room.Broadcast(data, conn)
+			if brErr != nil {
+				logger.Error("handler", slog.Any("answer error:", brErr))
+			}
 		}
 
-		if brErr := cm.Broadcast(data, conn, logger); brErr != nil {
-			logger.Error("broadcast", slog.Any("err", brErr))
-		}
-
+		// Логирование временное
 		if config.Current().Debug {
 			printSocketData(data, logger, conn)
 		}

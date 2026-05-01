@@ -18,7 +18,7 @@ const usernamePrefix = "nofelet_user"
 
 // GetCoTURNCredentials /turn-credentials/generate генерит временные креды для CoTURN
 func (c *Controller) GetCoTURNCredentials(ctx *gin.Context) {
-	conn, sErr := NewWebSocket(ctx, c.Logger)
+	conn, sErr := Upgrader(ctx)
 	if sErr != nil {
 		c.Logger.Error("socket creation", slog.Any("err", sErr))
 	}

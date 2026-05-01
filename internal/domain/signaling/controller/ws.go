@@ -1,7 +1,6 @@
 package controller
 
 import (
-	"log/slog"
 	"net/http"
 	"time"
 
@@ -13,8 +12,8 @@ const (
 	handshakeTimeout = 60 * time.Second
 )
 
-// NewWebSocket создает настроенный сокет
-func NewWebSocket(ctx *gin.Context, logger *slog.Logger) (*websocket.Conn, error) {
+// Upgrader - создает сокетовое соединение с удаленным клиентом
+func Upgrader(ctx *gin.Context) (*websocket.Conn, error) {
 	u := websocket.Upgrader{
 		CheckOrigin: func(r *http.Request) bool {
 			return true
@@ -26,7 +25,6 @@ func NewWebSocket(ctx *gin.Context, logger *slog.Logger) (*websocket.Conn, error
 
 	conn, err := u.Upgrade(ctx.Writer, ctx.Request, nil)
 	if err != nil {
-		logger.Error("websocket", slog.Any("err", err))
 		return nil, err
 	}
 	conn.SetReadLimit(8192)
