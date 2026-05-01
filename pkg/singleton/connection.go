@@ -1,7 +1,6 @@
 package singleton
 
 import (
-	"log/slog"
 	"sync"
 
 	"github.com/gorilla/websocket"
@@ -11,61 +10,88 @@ import (
 
 var (
 	once     sync.Once
-	instance *ConnectionManager
+	instance *Rooms
 )
 
-// ConnectionManager хранит коннкты клиентов
-type ConnectionManager struct {
-	Mu      sync.RWMutex
-	clients map[*websocket.Conn]string
+type Room struct {
+	Initiator    *Participant // Участник звонка
+	Callee       *Participant
+	PendingOffer *view.SDPData // Данные SDP сессии
 }
 
-// NewConnectionManager возвращает единственный экземпляр ConnectionManager
-func NewConnectionManager() *ConnectionManager {
+type Participant struct {
+	Conn     *websocket.Conn // Объект коннекшена участника звонка
+	Nickname string          // Ник участника звонка
+	Role     string          // Роль участника звонка
+}
+
+// Rooms - хранит и управляет комнатами
+type Rooms struct {
+	Mu    sync.RWMutex
+	Rooms map[string]*Room
+}
+
+// NewRoom - создает коммнату
+func NewRoom() *Rooms {
 	once.Do(func() {
-		instance = &ConnectionManager{
-			clients: make(map[*websocket.Conn]string),
+		instance = &Rooms{
+			Rooms: make(map[string]*Room),
 		}
 	})
 	return instance
 }
 
-// Save сохраняет коннекшен и uuid клиента
-func (cm *ConnectionManager) Save(conn *websocket.Conn, uuid string) {
+// Init - инициализирует комнату с конкретным uuid и инициализирует ее дефолтно
+func (cm *Rooms) Init(uuid string) {
 	cm.Mu.Lock()
-	cm.clients[conn] = uuid
+	if _, ok := cm.Rooms[uuid]; !ok {
+		cm.Rooms[uuid] = &Room{
+			Initiator:    &Participant{},
+			Callee:       &Participant{},
+			PendingOffer: &view.SDPData{},
+		}
+	}
 	cm.Mu.Unlock()
 }
 
-// DeleteClient удаляем коннекшен клиента
-func (cm *ConnectionManager) DeleteClient(conn *websocket.Conn) {
+// DeleteClient - удаляем коннекшен клиента
+func (cm *Rooms) DeleteClient(uuid string) {
 	cm.Mu.Lock()
-	delete(cm.clients, conn)
+	delete(cm.Rooms, uuid)
 	cm.Mu.Unlock()
 }
 
-// Connections возвращает количество клиентов
-func (cm *ConnectionManager) Connections() int {
+// Connections - возвращает количество клиентов
+func (cm *Rooms) Connections() int {
 	cm.Mu.RLock()
 	defer cm.Mu.RUnlock()
-	return len(cm.clients)
+	return len(cm.Rooms)
 }
 
-// Broadcast рассылает сообщения все клиентам доя установления SDP сессии
-func (cm *ConnectionManager) Broadcast(data view.SDPData, sender *websocket.Conn, logger *slog.Logger) error {
+// Broadcast - рассылает сообщения все клиентам доя установления SDP сессии
+func (cm *Rooms) Broadcast(data view.SDPData, sender *websocket.Conn) error {
 	cm.Mu.RLock()
 	defer cm.Mu.RUnlock()
 
-	for client, id := range cm.clients {
-		if id == cm.clients[sender] {
-			if client != sender {
-				err := client.WriteJSON(data)
-				if err != nil {
-					logger.Error("Broadcast func", slog.Any("err", err))
-					_ = client.Close()
-					delete(cm.clients, client)
-					return err
-				}
+	for roomID, room := range cm.Rooms {
+		initiator := room.Initiator.Conn
+		callee := room.Callee.Conn
+
+		if initiator == sender {
+			err := callee.WriteJSON(data)
+			if err != nil {
+				_ = initiator.Close()
+				delete(cm.Rooms, roomID)
+				return err
+			}
+		}
+
+		if callee == sender {
+			err := initiator.WriteJSON(data)
+			if err != nil {
+				_ = callee.Close()
+				delete(cm.Rooms, roomID)
+				return err
 			}
 		}
 	}
