@@ -2,7 +2,7 @@ version: '3.8'
 
 services:
   app:
-    image: ghcr.io/maximtretjakov/nofelet:latest
+    image: ghcr.io/maximtretjakov/nofelet-signaling:latest
     container_name: signaling_server
     restart: always
     ports:
