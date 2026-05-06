@@ -12,12 +12,7 @@ import (
 	"nofelet/pkg/singleton"
 )
 
-const (
-	caller = "caller"
-	callee = "callee"
-)
-
-// GetConnection /connect/:uuid установка sdp сессии
+// GetConnection - /connect/:uuid установка sdp сессии
 func (c *Controller) GetConnection(ctx *gin.Context) {
 	conn, sErr := Upgrader(ctx)
 	if sErr != nil {
@@ -25,7 +20,6 @@ func (c *Controller) GetConnection(ctx *gin.Context) {
 	}
 
 	uuid := ctx.Param("uuid")
-
 	room := singleton.NewRoom()
 	room.Init(uuid)
 
@@ -33,7 +27,7 @@ func (c *Controller) GetConnection(ctx *gin.Context) {
 }
 
 // handler - обрабатывает коннекты участников
-func handler(conn *websocket.Conn, uuid string, room *singleton.Rooms, logger *slog.Logger) {
+func handler(conn *websocket.Conn, uuid string, room *singleton.RoomManager, logger *slog.Logger) {
 	defer func() {
 		room.DeleteClient(uuid)
 		_ = conn.Close()
@@ -42,8 +36,7 @@ func handler(conn *websocket.Conn, uuid string, room *singleton.Rooms, logger *s
 	var data view.SDPData
 
 	for {
-		readErr := conn.ReadJSON(&data)
-		if readErr != nil {
+		if readErr := conn.ReadJSON(&data); readErr != nil {
 			logger.Error("socket read", slog.Any("err", readErr))
 			break
 		}

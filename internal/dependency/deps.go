@@ -8,13 +8,14 @@ import (
 	"nofelet/internal/dependency/signaling"
 )
 
-// Container основной контейнер зависимостей
+// Container - основной контейнер зависимостей
 type Container struct {
 	Signaling *signaling.Container
 	Logger    *slog.Logger
 	Cfg       *config.Config
 }
 
+// New - создает DI контейнер
 func New(Cfg *config.Config, logger *slog.Logger) (*Container, error) {
 	SignalingContainer, err := signaling.New(Cfg, logger)
 	if err != nil {

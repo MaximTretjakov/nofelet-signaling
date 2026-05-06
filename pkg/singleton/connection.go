@@ -10,12 +10,12 @@ import (
 
 var (
 	once     sync.Once
-	instance *Rooms
+	instance *RoomManager
 )
 
 type Room struct {
-	Initiator    *Participant // Участник звонка
-	Callee       *Participant
+	Initiator    *Participant  // Инициатор звонка
+	Callee       *Participant  // Участник звонка
 	PendingOffer *view.SDPData // Данные SDP сессии
 }
 
@@ -25,16 +25,16 @@ type Participant struct {
 	Role     string          // Роль участника звонка
 }
 
-// Rooms - хранит и управляет комнатами
-type Rooms struct {
-	Mu    sync.RWMutex
+// RoomManager - хранит и управляет комнатами
+type RoomManager struct {
+	mu    sync.RWMutex
 	Rooms map[string]*Room
 }
 
-// NewRoom - создает коммнату
-func NewRoom() *Rooms {
+// NewRoom - создает комнату
+func NewRoom() *RoomManager {
 	once.Do(func() {
-		instance = &Rooms{
+		instance = &RoomManager{
 			Rooms: make(map[string]*Room),
 		}
 	})
@@ -42,57 +42,53 @@ func NewRoom() *Rooms {
 }
 
 // Init - инициализирует комнату с конкретным uuid и инициализирует ее дефолтно
-func (cm *Rooms) Init(uuid string) {
-	cm.Mu.Lock()
-	if _, ok := cm.Rooms[uuid]; !ok {
-		cm.Rooms[uuid] = &Room{
+func (rm *RoomManager) Init(uuid string) {
+	rm.mu.Lock()
+	if _, ok := rm.Rooms[uuid]; !ok {
+		rm.Rooms[uuid] = &Room{
 			Initiator:    &Participant{},
 			Callee:       &Participant{},
 			PendingOffer: &view.SDPData{},
 		}
 	}
-	cm.Mu.Unlock()
+	rm.mu.Unlock()
 }
 
 // DeleteClient - удаляем коннекшен клиента
-func (cm *Rooms) DeleteClient(uuid string) {
-	cm.Mu.Lock()
-	delete(cm.Rooms, uuid)
-	cm.Mu.Unlock()
+func (rm *RoomManager) DeleteClient(uuid string) {
+	rm.mu.Lock()
+	delete(rm.Rooms, uuid)
+	rm.mu.Unlock()
 }
 
 // Connections - возвращает количество клиентов
-func (cm *Rooms) Connections() int {
-	cm.Mu.RLock()
-	defer cm.Mu.RUnlock()
-	return len(cm.Rooms)
+func (rm *RoomManager) Connections() int {
+	rm.mu.RLock()
+	defer rm.mu.RUnlock()
+	return len(rm.Rooms)
 }
 
 // Broadcast - рассылает сообщения все клиентам доя установления SDP сессии
-func (cm *Rooms) Broadcast(data view.SDPData, sender *websocket.Conn) error {
-	cm.Mu.RLock()
-	defer cm.Mu.RUnlock()
+func (rm *RoomManager) Broadcast(data view.SDPData, sender *websocket.Conn) error {
+	rm.mu.RLock()
+	defer rm.mu.RUnlock()
 
-	for roomID, room := range cm.Rooms {
+	for roomID, room := range rm.Rooms {
 		initiator := room.Initiator.Conn
 		callee := room.Callee.Conn
 
-		if initiator == sender {
-			err := callee.WriteJSON(data)
-			if err != nil {
+		if sender == initiator {
+			if err := callee.WriteJSON(data); err != nil {
 				_ = initiator.Close()
-				delete(cm.Rooms, roomID)
+				delete(rm.Rooms, roomID)
 				return err
 			}
 		}
 
-		if callee == sender {
-			err := initiator.WriteJSON(data)
-			if err != nil {
-				_ = callee.Close()
-				delete(cm.Rooms, roomID)
-				return err
-			}
+		if err := initiator.WriteJSON(data); err != nil {
+			_ = callee.Close()
+			delete(rm.Rooms, roomID)
+			return err
 		}
 	}
 

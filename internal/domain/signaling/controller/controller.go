@@ -11,7 +11,7 @@ type Controller struct {
 	Config *config.Config
 }
 
-func New(logger *slog.Logger, cfg *config.Config) *Controller {
+func NewController(logger *slog.Logger, cfg *config.Config) *Controller {
 	return &Controller{
 		Logger: logger,
 		Config: cfg,
