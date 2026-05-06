@@ -16,7 +16,7 @@ import (
 
 const usernamePrefix = "nofelet_user"
 
-// GetCoTURNCredentials /turn-credentials/generate генерит временные креды для CoTURN
+// GetCoTURNCredentials - /turn-credentials/generate генерит временные креды для CoTURN
 func (c *Controller) GetCoTURNCredentials(ctx *gin.Context) {
 	conn, sErr := Upgrader(ctx)
 	if sErr != nil {
@@ -26,12 +26,12 @@ func (c *Controller) GetCoTURNCredentials(ctx *gin.Context) {
 
 	credentials := generateCoTurnCredentials(c.Config)
 
-	err := conn.WriteJSON(credentials)
-	if err != nil {
+	if err := conn.WriteJSON(credentials); err != nil {
 		c.Logger.Error("generate coturn credentials", slog.Any("error", err))
 	}
 }
 
+// generateCoTurnCredentials - генерит креды для доступа к coturn
 func generateCoTurnCredentials(cfg *config.Config) view.TURNConfig {
 	// Логин (username) - это временная метка в минутах
 	login := fmt.Sprintf("%d", time.Now().Add(24*time.Hour).Unix())

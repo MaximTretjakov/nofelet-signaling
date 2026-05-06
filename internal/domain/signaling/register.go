@@ -2,13 +2,13 @@ package signaling
 
 import (
 	"nofelet/internal/dependency"
-	sdpController "nofelet/internal/domain/signaling/controller"
+	sc "nofelet/internal/domain/signaling/controller"
 )
 
 func Register(deps *dependency.Container) {
-	controller := sdpController.New(deps.Logger, deps.Cfg)
+	c := sc.NewController(deps.Logger, deps.Cfg)
 
-	sdp := deps.Signaling.Routes
-	sdp.GET("/connect/:uuid", controller.GetConnection)
-	sdp.GET("/turn-credentials/generate", controller.GetCoTURNCredentials)
+	r := deps.Signaling.Routes
+	r.GET("/connect/:uuid", c.GetConnection)
+	r.GET("/turn-credentials/generate", c.GetCoTURNCredentials)
 }

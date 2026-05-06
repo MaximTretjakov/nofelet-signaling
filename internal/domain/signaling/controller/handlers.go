@@ -7,8 +7,13 @@ import (
 	"nofelet/pkg/singleton"
 )
 
+const (
+	caller = "caller"
+	callee = "callee"
+)
+
 // Join - Обрабатывает событие join
-func Join(data view.SDPData, conn *websocket.Conn, r *singleton.Room, rs *singleton.Rooms) error {
+func Join(data view.SDPData, conn *websocket.Conn, r *singleton.Room, rs *singleton.RoomManager) error {
 	// Кто пришел? Инициатор или собеседник?
 	if data.Participant.Role == caller {
 		r.Initiator.Conn = conn
@@ -49,15 +54,14 @@ func Join(data view.SDPData, conn *websocket.Conn, r *singleton.Room, rs *single
 }
 
 // Offer - Обрабатывает событие offer
-func Offer(data view.SDPData, conn *websocket.Conn, r *singleton.Room, rs *singleton.Rooms) error {
+func Offer(data view.SDPData, conn *websocket.Conn, r *singleton.Room, rs *singleton.RoomManager) error {
 	if r.Callee.Conn == nil {
 		offer := data
 		r.PendingOffer = &offer
 		return nil
 	}
 
-	brErr := rs.Broadcast(data, conn)
-	if brErr != nil {
+	if brErr := rs.Broadcast(data, conn); brErr != nil {
 		return brErr
 	}
 
@@ -65,15 +69,14 @@ func Offer(data view.SDPData, conn *websocket.Conn, r *singleton.Room, rs *singl
 }
 
 // IceCandidate - Обрабатывает событие ice-candidate
-func IceCandidate(data view.SDPData, conn *websocket.Conn, r *singleton.Room, rs *singleton.Rooms) error {
+func IceCandidate(data view.SDPData, conn *websocket.Conn, r *singleton.Room, rs *singleton.RoomManager) error {
 	data.SDP = ""
 
 	if r.Callee.Conn == nil {
 		return nil
 	}
 
-	brErr := rs.Broadcast(data, conn)
-	if brErr != nil {
+	if brErr := rs.Broadcast(data, conn); brErr != nil {
 		return brErr
 	}
 

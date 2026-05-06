@@ -16,6 +16,7 @@ type Container struct {
 	Cfg    *config.Config
 }
 
+// New - создает объект сигналинга
 func New(cfg *config.Config, logger *slog.Logger) (*Container, error) {
 	routes, err := newRoutes()
 	if err != nil {
@@ -29,6 +30,7 @@ func New(cfg *config.Config, logger *slog.Logger) (*Container, error) {
 	}, nil
 }
 
+// newRoutes - инициализация роутера
 func newRoutes() (*gin.Engine, error) {
 	router := gin.New()
 	router.ContextWithFallback = true
