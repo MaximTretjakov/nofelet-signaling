@@ -1,42 +1,42 @@
 package controller
 
 import (
-	"fmt"
 	"log/slog"
 
 	"github.com/gin-gonic/gin"
-	"github.com/gorilla/websocket"
 
-	"nofelet/config"
+	"nofelet/decorator"
 	"nofelet/internal/domain/signaling/controller/view"
 	"nofelet/pkg/singleton"
 )
 
 // GetConnection - /connect/:uuid установка sdp сессии
 func (c *Controller) GetConnection(ctx *gin.Context) {
-	conn, sErr := Upgrader(ctx)
+	upgradedConn, sErr := Upgrader(ctx)
 	if sErr != nil {
 		c.Logger.Error("socket creation", slog.Any("err", sErr))
 	}
+
+	managedConn := decorator.NewConn(upgradedConn, c.Logger, c.Config)
 
 	uuid := ctx.Param("uuid")
 	room := singleton.NewRoom()
 	room.Init(uuid)
 
-	go handler(conn, uuid, room, c.Logger)
+	go handler(managedConn, uuid, room, c.Logger)
 }
 
 // handler - обрабатывает коннекты участников
-func handler(conn *websocket.Conn, uuid string, room *singleton.RoomManager, logger *slog.Logger) {
+func handler(mc *decorator.ConnectionManager, uuid string, room *singleton.RoomManager, logger *slog.Logger) {
 	defer func() {
 		room.DeleteClient(uuid)
-		_ = conn.Close()
+		_ = mc.Close()
 	}()
 
 	var data view.SDPData
 
 	for {
-		if readErr := conn.ReadJSON(&data); readErr != nil {
+		if readErr := mc.ReadJSON(&data); readErr != nil {
 			logger.Error("socket read", slog.Any("err", readErr))
 			break
 		}
@@ -45,39 +45,25 @@ func handler(conn *websocket.Conn, uuid string, room *singleton.RoomManager, log
 
 		switch data.Type {
 		case "join":
-			jErr := Join(data, conn, r, room)
+			jErr := Join(data, mc.Conn, r, room)
 			if jErr != nil {
 				logger.Error("handler", slog.Any("join error:", jErr))
 			}
 		case "offer":
-			oErr := Offer(data, conn, r, room)
+			oErr := Offer(data, mc.Conn, r, room)
 			if oErr != nil {
 				logger.Error("handler", slog.Any("offer error:", oErr))
 			}
 		case "ice-candidate":
-			iceErr := IceCandidate(data, conn, r, room)
+			iceErr := IceCandidate(data, mc.Conn, r, room)
 			if iceErr != nil {
 				logger.Error("handler", slog.Any("ice-candidate error:", iceErr))
 			}
 		case "answer":
-			brErr := room.Broadcast(data, conn)
+			brErr := room.Broadcast(data, mc.Conn)
 			if brErr != nil {
 				logger.Error("handler", slog.Any("answer error:", brErr))
 			}
 		}
-
-		// Логирование временное
-		if config.Current().Debug {
-			printSocketData(data, logger, conn)
-		}
 	}
-}
-
-func printSocketData(data view.SDPData, logger *slog.Logger, conn *websocket.Conn) {
-	fmt.Println()
-	message := fmt.Sprintf("from=%s | data=%+v\n",
-		conn.RemoteAddr().String(),
-		data,
-	)
-	logger.Info("wss", slog.String(":", message))
 }
