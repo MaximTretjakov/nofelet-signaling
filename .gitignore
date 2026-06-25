@@ -39,3 +39,4 @@ spec.gen.go
 
 docs/swagger.yaml
 **/.DS_Store
+.env

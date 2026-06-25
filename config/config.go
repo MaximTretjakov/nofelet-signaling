@@ -9,15 +9,15 @@ import (
 )
 
 type Config struct {
-	WS     WSConfig `env:",prefix=WS_"`     // Инфа сервера
-	CoTURN CoTURN   `env:",prefix=COTURN_"` // Котерн инфа
-	Debug  bool     `env:"DEBUG"`           // Дебаг режимы
+	WS     WSConfig `env:",prefix=SIGNALING_"`  // Инфа сервера
+	CoTURN CoTURN   `env:",prefix=COTURN_"`     // Котерн инфа
+	Debug  bool     `env:"SIGNALING_DEBUG"`     // Дебаг режимы
+	Crt    string   `env:"SERVER_CRT,required"` // Сертификат
+	Key    string   `env:"SERVER_KEY,required"` // Сертификат
 }
 
 type WSConfig struct {
 	Port              string        `env:"PORT,required"`                   // Порт
-	ServerCrt         string        `env:"SERVER_CRT,required"`             // Сертификат
-	ServerKey         string        `env:"SERVER_KEY,required"`             // Сертификат
 	ReadTimeout       time.Duration `env:"READ_TIMEOUT,default=30s"`        // Таймаут на чтение
 	WriteTimeout      time.Duration `env:"WRITE_TIMEOUT,default=30s"`       // Таймаут на запись
 	ReadHeaderTimeout time.Duration `env:"READ_HEADER_TIMEOUT,default=30s"` // Таймаут на чтение хедеров

@@ -6,7 +6,7 @@ RUN go mod download
 COPY . .
 
 # Собираем из папки cmd/signaling
-RUN CGO_ENABLED=0 GOOS=linux go build -ldflags="-w -s" -o nofelet ./cmd/signaling
+RUN CGO_ENABLED=0 GOOS=linux go build -ldflags="-w -s" -o nofelet-signaling ./cmd/signaling
 
 # --- Этап запуска ---
 FROM alpine:latest
@@ -19,4 +19,4 @@ COPY --from=builder /app/nofelet .
 EXPOSE 8443
 
 # Запускаем именно nofelet
-CMD ["./nofelet"]
+CMD ["./nofelet-signaling"]
